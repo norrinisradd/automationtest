@@ -61,6 +61,7 @@
         wait: yes
         instance_tags:
           application: dockerhosts
+        instance_profile_name: cloudwatch
         monitoring: yes
         exact_count: "{{ instance_count }}"
         count_tag:
@@ -106,7 +107,7 @@
         state: started
     - name: Install pypi
       easy_install: name=pip
-    - name: Install docker-py 
+    - name: Install docker-py
       pip:
          name: "{{ item }}"
          state: present
@@ -118,6 +119,11 @@
         name: codetest
         image: "{{ image_name }}"
         state: started
+        log_driver: awslogs
+        log_options:
+          awslogs-region: "{{ ec2_region }}"
+          awslogs-group: dockerhosts
+          awslogs-stream: codetest
         published_ports: "80:{{ docker_port }}"
 
 - hosts: localhost

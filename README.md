@@ -6,6 +6,10 @@ Using Ansible to deploy a load balanced containizered web application to AWS
 
 **AWS IAM User** - Please setup a new IAM user with programatic access and add them to a group that has the PowerUser role, you will need to supply this new user's access key and secret in vars.yml.
 
+**AWS IAM Role** - Please setup a new IAM role named `cloudwatch`, Create IAM Role -> AWS service -> EC2 -> EC2 Use Case -> attach CloudWatchLogsFullAccess policy
+
+**CloudWatch Logs Group** - Please create a new group name under Cloudwatch Logs called `dockerhosts`
+
 **SSH Access to AWS** - A firewall will cause an issue if SSH out is not open.
 
 ## Assumptions
