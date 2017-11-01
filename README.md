@@ -7,6 +7,7 @@ Using Ansible to deploy a load balanced containizered web application to AWS
 **AWS IAM User** - Please setup a new IAM user with programatic access and add them to the Poweruser group, you will need to supply this user's access key and secret in vars.yml.
 
 **SSH Access to AWS** - A firewall will cause an issue if SSH out is not open.
+
 ## Assumptions
 User is not behind a web proxy as this may affect the testing and verification of the solution since the access list (security group) is created dynamically using checkip.amazonaws.com.
 ## Deployment Instructions
