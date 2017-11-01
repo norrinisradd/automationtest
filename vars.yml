@@ -1,0 +1,9 @@
+ec2_region: us-east-1
+instance_count: 3
+ec2_instance_type: t2.micro
+ec2_image: ami-8c1be5f6
+ec2_keypair: dockerhosts
+docker_port: 5000
+image_name: training/webapp
+ec2_access_key: MYACCESS
+ec2_secret_key: MYSECRET

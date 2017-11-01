@@ -1,0 +1,145 @@
+- hosts: localhost
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Get my current IP address
+      uri:
+        url: http://checkip.amazonaws.com/
+        return_content: yes
+      register: my_ip
+
+    - name: Create security group using my_ip
+      ec2_group:
+        name: dockerhosts
+        description: A security group for my current IP
+        region: "{{ ec2_region }}"
+        ec2_access_key: "{{ ec2_access_key }}"
+        ec2_secret_key: "{{ ec2_secret_key }}"
+        rules:
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            cidr_ip: "{{ my_ip.content | replace('\n', '') }}/32"
+          - proto: tcp
+            from_port: 22
+            to_port: 22
+            cidr_ip: "{{ my_ip.content | replace('\n', '') }}/32"
+        rules_egress:
+          - proto: tcp
+            from_port: 80
+            to_port: 80
+            cidr_ip: 0.0.0.0/0
+      register: dockerhosts_group
+
+    - name: Create the ELB listening over port TCP/80
+      ec2_elb_lb:
+        name: dockerhosts-load-balancer
+        state: present
+        region: "{{ ec2_region }}"
+        ec2_access_key: "{{ ec2_access_key }}"
+        ec2_secret_key: "{{ ec2_secret_key }}"
+        zones:
+          - "{{ ec2_region }}a"
+          - "{{ ec2_region }}b"
+        listeners:
+          - protocol: http
+            load_balancer_port: 80
+            instance_port: 80
+      register: elb
+
+    - name: Create EC2 instances based on instance_count
+      ec2:
+        key_name: "{{ ec2_keypair }}"
+        instance_type: "{{ ec2_instance_type }}"
+        image: "{{ ec2_image }}"
+        region: "{{ ec2_region }}"
+        ec2_access_key: "{{ ec2_access_key }}"
+        ec2_secret_key: "{{ ec2_secret_key }}"
+        group_id:
+          - "{{ dockerhosts_group.group_id }}"
+          - "{{ elb.elb.security_group_ids | first }}"
+        wait: yes
+        instance_tags:
+          application: dockerhosts
+        monitoring: yes
+        exact_count: "{{ instance_count }}"
+        count_tag:
+          application: dockerhosts
+      register: ec2_instances
+
+    - name: Store EC2 instance IPs dynamically
+      add_host:
+        hostname: "{{ item.public_ip }}"
+        groupname: ec2_instance_ips
+      with_items: "{{ ec2_instances.tagged_instances }}"
+
+    - name: Wait for instances to come online
+      wait_for:
+        host: "{{ item.public_ip }}"
+        port: 22
+        timeout: 180
+      with_items: "{{ ec2_instances.tagged_instances }}"
+
+    - name: Add EC2 instances as known hosts
+      known_hosts:
+        name: "{{ item.public_ip }}"
+        key: "{{ lookup('pipe', 'ssh-keyscan -t rsa ' + item.public_ip) }}"
+      with_items: "{{ ec2_instances.tagged_instances }}"
+
+- hosts: ec2_instance_ips
+  vars_files:
+    - vars.yml
+  connection: ssh
+  remote_user: ec2-user
+  become: True
+  tasks:
+    - name: Install python setup tools and docker
+      yum:
+        name: "{{ item }}"
+        update_cache: yes
+      with_items:
+        - python-setuptools
+        - docker
+    - name: Start docker
+      service:
+        name: docker
+        state: started
+    - name: Install pypi
+      easy_install: name=pip
+    - name: Install docker-py 
+      pip:
+         name: "{{ item }}"
+         state: present
+         extra_args: "-i https://pypi.doubanio.com/simple"
+      with_items:
+         - docker-py
+    - name: Install container based on image_name and docker_port
+      docker_container:
+        name: codetest
+        image: "{{ image_name }}"
+        state: started
+        published_ports: "80:{{ docker_port }}"
+
+- hosts: localhost
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Add each EC2 instance to the ELB
+      ec2_elb:
+        state: present
+        ec2_elbs: dockerhosts-load-balancer
+        region: "{{ ec2_region }}"
+        ec2_access_key: "{{ ec2_access_key }}"
+        ec2_secret_key: "{{ ec2_secret_key }}"
+        wait: no
+        instance_id: "{{ item.id }}"
+      with_items: "{{ ec2_instances.tagged_instances }}"
+    - name: Get ELB Facts then display default ELB URL
+      local_action:
+        module: ec2_elb_facts
+        region: "{{ ec2_region }}"
+        ec2_access_key: "{{ ec2_access_key }}"
+        ec2_secret_key: "{{ ec2_secret_key }}"
+      register: elb_facts
+    - name: debug
+      debug: msg="Please wait about 15 seconds for the ELB health checks to pass then run then curl or browse to http://{{ elb_facts.elbs.0.dns_name }}"
