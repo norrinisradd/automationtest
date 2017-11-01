@@ -4,7 +4,7 @@ Using Ansible to deploy a load balanced containizered web application to AWS
 ## Requirements
 **AWS Keypair** - In this example I am using keypair `dockerhosts`, if you choose another name you will need to update references in vars.yml (`ec2_keypair`), start.sh (pem filename), and the Vagrantfile (pem filename).
 
-**AWS IAM User** - Please setup a new IAM user with programatic access and add them to the Poweruser group, you will need to supply this user's access key and secret in vars.yml.
+**AWS IAM User** - Please setup a new IAM user with programatic access and add them to a group that has the PowerUser role, you will need to supply this new user's access key and secret in vars.yml.
 
 **SSH Access to AWS** - A firewall will cause an issue if SSH out is not open.
 
